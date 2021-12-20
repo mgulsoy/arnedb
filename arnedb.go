@@ -20,6 +20,7 @@ type ArneDB struct {
 	colls   map[string]*Coll // içindeki Coll'lar (Kolleksiyonlar)
 }
 
+// Open Opens an existing or creates a new database.
 func Open(baseDir, dbName string) (*ArneDB, error) {
 
 	// baseDir var mı? Yoksa oluştur.
@@ -60,6 +61,8 @@ func Open(baseDir, dbName string) (*ArneDB, error) {
 		make(map[string]*Coll),
 	}
 
+	// TODO: Veritabanı compact işlemleri yapılması
+
 	// Şimdi (coll) kolleksiyonlar yüklenir.
 	files, err := ioutil.ReadDir(dbPath)
 	if err != nil {
@@ -81,4 +84,52 @@ func Open(baseDir, dbName string) (*ArneDB, error) {
 	// klasörlerin her biri bizim kolleksiyonumuzdur.
 
 	return &db, nil // hatasız dönüş
+}
+
+// TODO: Export işlemi : Zip dosyası olarak export edilir.
+// TODO: Import işlemi : Zip dosyası import edilir.
+
+// Herhangi bir şeyi bellekte tutmadığımız için Close gibi bir işleme ihtiyacımız yok.
+
+// Collection İşlemleri ---------------------------------------------------------------
+
+// CreateColl  Creates a collection and returns it.
+func (db *ArneDB) CreateColl(collName string) (*Coll, error) {
+	// Oluşturulmak istenen collection var mı ona bakarız.
+	collPath := filepath.Join(db.path, collName)
+	_, err := os.Stat(collPath)
+
+	if os.IsExist(err) {
+		return nil, errors.New(fmt.Sprintf("a dir name exists with the same name: %s -> %s", collName, err.Error()))
+	}
+
+	// Klasör yok demektir.
+	err = os.Mkdir(collPath, 0700)
+	if err != nil {
+		return nil, err
+	} // klasörü oluşturamadı
+
+	var c = Coll{
+		Name:   collName,
+		dbpath: collPath,
+	}
+	db.colls[c.Name] = &c
+
+	return &c, nil
+}
+
+// DeleteColl Deletes a given collection.
+func (db *ArneDB) DeleteColl(collName string) error {
+	collObj := db.colls[collName]
+	if collObj == nil {
+		return errors.New("collection does not exist")
+	}
+
+	err := os.RemoveAll(collObj.dbpath)
+	if err == nil {
+		delete(db.colls, collName)
+	}
+
+	// işlem başarılı
+	return err
 }
