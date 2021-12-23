@@ -67,28 +67,31 @@ func TestCollectionOperations(t *testing.T) {
 		t.Fatal("Add(1) Failed with: ", err)
 	}
 
-	e1["id"] = 35
-	e1["name"] = "hasan"
-	e1["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e1)
+	e2 := make(map[string]interface{})
+	e2["id"] = 35
+	e2["name"] = "hasan"
+	e2["unixtime"] = time.Now().Unix()
+	_, err = birinci.Add(e2)
 	if err != nil {
 		t.Fatal("Add(2) Failed with: ", err)
 	}
 
-	e1["id"] = 36
-	e1["name"] = "Multiline\ndata"
-	e1["user"] = "sülüman"
-	e1["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e1)
+	e3 := make(map[string]interface{})
+	e3["id"] = 36
+	e3["name"] = "Multiline\ndata"
+	e3["user"] = "sülüman"
+	e3["unixtime"] = time.Now().Unix()
+	_, err = birinci.Add(e3)
 	if err != nil {
 		t.Fatal("Add(3) Failed with: ", err)
 	}
 
-	e1["id"] = 40
-	e1["name"] = "Mudata"
-	e1["user"] = "sülümanos 40"
-	e1["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e1)
+	e4 := make(map[string]interface{})
+	e4["id"] = 40
+	e4["name"] = "Mud,ata"
+	e4["user"] = "sülümanos 40"
+	e4["unixtime"] = time.Now().Unix()
+	_, err = birinci.Add(e4)
 	if err != nil {
 		t.Fatal("Add(4) Failed with: ", err)
 	}
@@ -110,7 +113,6 @@ func TestCollectionOperations(t *testing.T) {
 	if err != nil {
 		t.Fatal("Error querying:", err)
 	}
-
 	if dd == nil {
 		t.Error("No data returned")
 	}
@@ -138,15 +140,20 @@ func TestCollectionOperations(t *testing.T) {
 	}
 
 	// kayıt silme işlemi 36 id'li kayıt silinir.
-	err = birinci.DeleteFirst(func(instance RecordInstance) bool {
+	dn, err := birinci.DeleteFirst(func(instance RecordInstance) bool {
 		return instance["id"].(float64) == 36
 	})
 	if err != nil {
 		t.Fatal("Error querying:", err)
 	} else {
-		t.Log("DeleteFirst operation returned no error.")
+		if dn == 1 {
+			t.Log("DeleteFirst operation successful.")
+		} else {
+			t.Error("DeleteFirst operation failed! n=", dn)
+		}
 	}
 
+	// Tümünü silme işlemi
 	n, err := birinci.DeleteAll(func(instance RecordInstance) bool {
 		return instance["id"].(float64) < 40
 	})
@@ -170,5 +177,32 @@ func TestCollectionOperations(t *testing.T) {
 	}
 
 	t.Logf("GetFirst(id>34) after delete query result (expect id=40): %+v ", dd)
+
+	// Tümünü ekleme işlemi
+	dataArray := []RecordInstance{e1, e2, e3, e4}
+
+	_, err = birinci.AddAll(dataArray...)
+	if err != nil {
+		t.Error("Cannot 'AddAll'", err)
+	} else {
+		t.Log("AddAll successful.")
+	}
+
+	// Update
+	ff := func(instance RecordInstance) bool {
+		return instance["id"].(float64) == 34
+	}
+
+	e1["name"] = "UpdateSingle yapıldı"
+	n, err = birinci.UpdateSingle(ff, e1)
+	if err != nil {
+		t.Error("Cannot update single:", err)
+	} else {
+		if n == 1 {
+			t.Log("Update single successful.")
+		} else {
+			t.Error("Update single did not return 1 as expected!")
+		}
+	}
 
 }

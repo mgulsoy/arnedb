@@ -1,3 +1,11 @@
+// Package arnedb implements database access layer. Using this package one can embed a simple
+// database functionality into his/her application. Arnedb is not a high performance database.
+// There are a lot of database products which can achieve high performance. Arnedb provides a
+// lightweight database implementation which is embeddable in any GO app. Design goals of Arnedb
+// are:
+// 		Low memory usage: Can be run in resource constrained environments
+//		Simplicity: Hence the name implies
+//		Text file storage: All the data is stored in text based JSON files
 package arnedb
 
 import (
