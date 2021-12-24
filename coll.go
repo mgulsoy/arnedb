@@ -26,6 +26,9 @@ type RecordInstance map[string]interface{}
 // QueryPredicate a function type receiving row instance and returning bool
 type QueryPredicate func(instance RecordInstance) bool
 
+// UpdateFunc alters the data matched by predicate
+type UpdateFunc func(ptrRecord *RecordInstance) *RecordInstance
+
 // Add Appends data into a collection
 func (coll *Coll) Add(data interface{}) (*Coll, error) {
 
@@ -427,12 +430,35 @@ func (coll *Coll) DeleteAll(predicate QueryPredicate) (n int, err error) {
 	return n, nil
 }
 
-// UpdateSingle updates the first occurence of the predicate result and returns the number of updates.
-// Obviously the return value is 1 if update successful and 0 if not.
+// ReplaceSingle replaces the first occurence of the predicate result with the newData and returns
+// the number of updates. Obviously the return value is 1 if update successful and 0 if not.
 // Update is the most costly operation. The library does not provide a method to update parts of a
-// document since document is not known to the system. Thus update operation deletes the original
-// record and appends the chunk.
-func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n int, err error) {
+// document since document is not known to the system.
+func (coll *Coll) ReplaceSingle(predicate QueryPredicate, newData interface{}) (n int, err error) {
+	return coll.replacer(predicate, newData, false)
+}
+
+// ReplaceAll replaces all the occurances of the predicate result with the newData and returns the
+// number of updates.
+// Replace is the most costly operation. The library does not provide a method to update parts of a
+// document since document is not known to the system.
+func (coll *Coll) ReplaceAll(predicate QueryPredicate, newData interface{}) (n int, err error) {
+	return coll.replacer(predicate, newData, true)
+}
+
+// UpdateSingle updates the first occurance of predicate result in place with the data provided by the
+// updateFunction
+func (coll *Coll) UpdateSingle(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
+	return coll.updater(predicate, updateFunction, false)
+}
+
+// UpdateAll updates all of the occurances of the predicate result in place with the data provided by the
+// updateFunction
+func (coll *Coll) UpdateAll(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
+	return coll.updater(predicate, updateFunction, true)
+}
+
+func (coll *Coll) updater(pred QueryPredicate, uf UpdateFunc, updateAll bool) (n int, err error) {
 	chunks, err := coll.getChunks()
 	n = 0
 	if err != nil {
@@ -442,13 +468,6 @@ func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n
 	if len(chunks) == 0 {
 		// İçeride hiç veri yok
 		return n, nil
-	}
-
-	// Yeni kayıt kontrol edilir
-	newDataBytes, err := json.Marshal(newData)
-	if err != nil {
-		// Yeni kayıt dönüştürülemiyor demektir.
-		return n, err
 	}
 
 	var f *os.File
@@ -477,7 +496,7 @@ func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n
 
 		scn := bufio.NewScanner(f)
 		buffer.Reset()
-		dataMatched := false
+		predicateMatched := false
 		anyMatchesOccured := false
 
 		// chunk verisi taranır ve bütün kayıtlar mem buffer içine yazılır.
@@ -485,14 +504,17 @@ func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n
 		for scn.Scan() {
 			line := scn.Bytes()
 			if len(line) == 0 {
-				dataMatched = false
+				predicateMatched = false
 			} else {
 				_ = json.Unmarshal(line, &data) // TODO: Handle error
-				dataMatched = predicate(data)
+				predicateMatched = pred(data)
 
-				if dataMatched && !anyMatchesOccured {
-					// Eğer daha önce bir değişiklik olmamışsa ve predicate eşleme yaptıysa
-					// yani ilk defa bir eşleme gerçekleşiyorsa...
+				if predicateMatched && (!anyMatchesOccured || updateAll) {
+					newData := uf(&data)
+					newDataBytes, err := json.Marshal(newData)
+					if err != nil {
+						panic(fmt.Sprintf("updateFunction result cannot be marshalled: %s", err.Error()))
+					}
 					buffer.Write(newDataBytes)
 				} else {
 					buffer.Write(line)
@@ -500,7 +522,7 @@ func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n
 			}
 
 			buffer.WriteString(recordSepStr)
-			anyMatchesOccured = anyMatchesOccured || dataMatched
+			anyMatchesOccured = anyMatchesOccured || predicateMatched
 		}
 		_ = f.Close() // TODO: Handle error
 		f = nil       // temizle
@@ -527,11 +549,7 @@ func (coll *Coll) UpdateSingle(predicate QueryPredicate, newData interface{}) (n
 	return n, nil
 }
 
-// UpdateAll updates all the occurances of the predicate result and returns the number of updates.
-// Update is the most costly operation. The library does not provide a method to update parts of a
-// document since document is not known to the system. Thus update operation deletes the original
-// record and appends the chunk.
-func (coll *Coll) UpdateAll(predicate QueryPredicate, newData RecordInstance) (n int, err error) {
+func (coll *Coll) replacer(pred QueryPredicate, nData interface{}, replaceAll bool) (n int, err error) {
 	chunks, err := coll.getChunks()
 	n = 0
 	if err != nil {
@@ -544,7 +562,7 @@ func (coll *Coll) UpdateAll(predicate QueryPredicate, newData RecordInstance) (n
 	}
 
 	// Yeni kayıt kontrol edilir
-	newDataBytes, err := json.Marshal(newData)
+	newDataBytes, err := json.Marshal(nData)
 	if err != nil {
 		// Yeni kayıt dönüştürülemiyor demektir.
 		return n, err
@@ -576,7 +594,7 @@ func (coll *Coll) UpdateAll(predicate QueryPredicate, newData RecordInstance) (n
 
 		scn := bufio.NewScanner(f)
 		buffer.Reset()
-		dataMatched := false
+		predicateMatched := false
 		anyMatchesOccured := false
 
 		// chunk verisi taranır ve bütün kayıtlar mem buffer içine yazılır.
@@ -584,12 +602,12 @@ func (coll *Coll) UpdateAll(predicate QueryPredicate, newData RecordInstance) (n
 		for scn.Scan() {
 			line := scn.Bytes()
 			if len(line) == 0 {
-				dataMatched = false
+				predicateMatched = false
 			} else {
 				_ = json.Unmarshal(line, &data) // TODO: Handle error
-				dataMatched = predicate(data)
+				predicateMatched = pred(data)
 
-				if dataMatched {
+				if predicateMatched && (!anyMatchesOccured || replaceAll) {
 					// Eğer daha önce bir değişiklik olmamışsa ve predicate eşleme yaptıysa
 					// yani ilk defa bir eşleme gerçekleşiyorsa...
 					buffer.Write(newDataBytes)
@@ -599,7 +617,7 @@ func (coll *Coll) UpdateAll(predicate QueryPredicate, newData RecordInstance) (n
 			}
 
 			buffer.WriteString(recordSepStr)
-			anyMatchesOccured = anyMatchesOccured || dataMatched
+			anyMatchesOccured = anyMatchesOccured || predicateMatched
 		}
 		_ = f.Close() // TODO: Handle error
 		f = nil       // temizle

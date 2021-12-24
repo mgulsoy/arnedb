@@ -70,6 +70,7 @@ func TestCollectionOperations(t *testing.T) {
 	e2 := make(map[string]interface{})
 	e2["id"] = 35
 	e2["name"] = "hasan"
+	e2["user"] = "mert"
 	e2["unixtime"] = time.Now().Unix()
 	_, err = birinci.Add(e2)
 	if err != nil {
@@ -193,16 +194,68 @@ func TestCollectionOperations(t *testing.T) {
 		return instance["id"].(float64) == 34
 	}
 
-	e1["name"] = "UpdateSingle yapıldı"
-	n, err = birinci.UpdateSingle(ff, e1)
+	e1["name"] = "ReplaceSingle yapıldı"
+	n, err = birinci.ReplaceSingle(ff, e1)
 	if err != nil {
-		t.Error("Cannot update single:", err)
+		t.Error("Cannot ReplaceSingle:", err)
 	} else {
 		if n == 1 {
-			t.Log("Update single successful.")
+			t.Log("ReplaceSingle successful.")
 		} else {
-			t.Error("Update single did not return 1 as expected!")
+			t.Error("ReplaceSingle did not return 1 as expected!")
 		}
 	}
 
+	f2 := func(instance RecordInstance) bool {
+		return instance["user"] == "mert"
+	}
+	e2["user"] = "ReplaceAll Yapıldı"
+	n, err = birinci.ReplaceAll(f2, e2)
+	if err != nil {
+		t.Error("ReplaceAll failed! ", err)
+	} else {
+		if n == 0 {
+			t.Error("ReplaceAll returned 0 records updated. 2 expected")
+		} else {
+			t.Log("ReplaceAll successful.")
+		}
+	}
+
+	f36 := QueryPredicate(func(i RecordInstance) bool {
+		return i["id"].(float64) == 36
+	})
+	fUpdt := UpdateFunc(func(ptrRecord *RecordInstance) *RecordInstance {
+		(*ptrRecord)["user"] = "Updated Single"
+		return ptrRecord
+	})
+
+	n, err = birinci.UpdateSingle(f36, fUpdt)
+	if err != nil {
+		t.Error("UpdateSingle failed")
+	} else {
+		if n == 0 {
+			t.Error("UpdateSingle returned 0 records updated. 1 expected")
+		} else {
+			t.Log("UpdateSingle successful.")
+		}
+	}
+
+	f40 := QueryPredicate(func(i RecordInstance) bool {
+		return i["id"].(float64) == 40
+	})
+	fUpdt40 := UpdateFunc(func(ptrRecord *RecordInstance) *RecordInstance {
+		(*ptrRecord)["user"] = "Updated All"
+		return ptrRecord
+	})
+
+	n, err = birinci.UpdateAll(f40, fUpdt40)
+	if err != nil {
+		t.Error("UpdateAll failed")
+	} else {
+		if n == 0 {
+			t.Error("UpdateAll returned 0 records updated. 2 expected")
+		} else {
+			t.Log("UpdateAll successful.")
+		}
+	}
 }
