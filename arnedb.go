@@ -128,16 +128,48 @@ func (db *ArneDB) CreateColl(collName string) (*Coll, error) {
 
 // DeleteColl Deletes a given collection.
 func (db *ArneDB) DeleteColl(collName string) error {
-	collObj := db.colls[collName]
-	if collObj == nil {
+	collObj, keyFound := db.colls[collName]
+	if !keyFound {
 		return errors.New("collection does not exist")
 	}
 
 	err := os.RemoveAll(collObj.dbpath)
-	if err == nil {
+	if err == nil { // file system removal success
 		delete(db.colls, collName)
 	}
 
 	// işlem başarılı
 	return err
+}
+
+// GetColl gets the collection by the given name. It returns the pointer if it finds a collection
+// with the given name. If not it returns nil
+func (db *ArneDB) GetColl(collName string) *Coll {
+
+	if len(db.colls) == 0 {
+		return nil // Return nil if there is no collection
+	}
+
+	c, keyExists := db.colls[collName]
+	if !keyExists {
+		return nil
+	}
+
+	return c
+}
+
+// GelCollNames returns all present collection names as []string
+func (db *ArneDB) GelCollNames() (result []string) {
+	if len(db.colls) == 0 {
+		return nil // Return nil if there is no collection
+	}
+
+	result = make([]string, len(db.colls))
+	i := 0
+	for k := range db.colls {
+		result[i] = k
+		i++
+	}
+
+	return result
 }

@@ -20,6 +20,7 @@ Go 1.17+
 
 * [Installation](#installation)
 * [Usage](#usage)
+    * [Db Management](#db management) 
 
 # Installation
 
@@ -39,17 +40,78 @@ import (
     "github.com/mgulsoy/arnedb"
 )
 ```
+### Db Management
 
 ArneDB uses a folder to store data. To create or open a database use `Open` function:
 
 ```go
 func main() {
-	ptrDbInstance, err := arnedb.Open("baseDir","databaseName")
-	if err != nil {
-	    panic(err)	
+    ptrDbInstance, err := arnedb.Open("baseDir","databaseName")
+    if err != nil {
+        panic(err)	
     }
 }
 ```
 
 The `Open` function checks whether `baseDir` exists and then creates `databaseName` database. 
-A `baseDir` can contain multiple databases.
+A `baseDir` can contain multiple databases. The database requires no closing operation.
+
+To store documents at first we need to create a collection. To create a collection we use 
+`CreateColl` function:
+
+```go
+func main() {
+    // Open or create a collection 
+    ptrDbInstance, err := arnedb.Open("baseDir","databaseName")
+    if err != nil {
+        panic(err)	
+    }
+
+    //Create a collection
+    ptrACollection, err := ptrDbInstance.CreateColl("aCollection")
+    if err != nil {
+        panic(err)
+    }
+}
+```
+
+The ```CreateColl``` function returns a pointer to a ```Coll``` struct. This will enable to
+interact with the collections created. The ```Open``` function loads existing collections. 
+If we want to delete a collection we can use the ```DeleteColl``` function.
+
+```go
+func main() {
+    // ...
+    err := ptrDbInstance.DeleteColl("anotherCollection")
+    if err != nil {
+        panic(err) // Not found or file system error	
+    }
+}
+```
+
+To get a slice (array) of the names of the collections we can use the ```GetCollNames``` 
+function:
+
+```go
+func main() {
+    // ...
+    collNames := ptrDbInstance.GetCollNames()
+    if collNames == nil {
+        // there is no collection
+        fmt.Println("There is no collection")
+    }
+}
+```
+
+To get a collection we use the ```GetColl``` function:
+
+```go
+func main() {
+    // ...
+    collNames := ptrDbInstance.GetCollNames()
+    if collNames == nil {
+        // there is no collection
+        fmt.Println("There is no collection")
+    }
+}
+```
