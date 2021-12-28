@@ -20,7 +20,8 @@ Go 1.17+
 
 * [Installation](#installation)
 * [Usage](#usage)
-    * [Db Management](#db management) 
+    * [Db Management](#db-management) 
+    * [Collection Operations And Query](#collection-operations-and-query)
 
 # Installation
 
@@ -75,9 +76,9 @@ func main() {
 }
 ```
 
-The ```CreateColl``` function returns a pointer to a ```Coll``` struct. This will enable to
-interact with the collections created. The ```Open``` function loads existing collections. 
-If we want to delete a collection we can use the ```DeleteColl``` function.
+The `CreateColl` function returns a pointer to a `Coll` struct. This will enable to
+interact with the collections created. The `Open` function loads existing collections. 
+If we want to delete a collection we can use the `DeleteColl` function.
 
 ```go
 func main() {
@@ -89,7 +90,7 @@ func main() {
 }
 ```
 
-To get a slice (array) of the names of the collections we can use the ```GetCollNames``` 
+To get a slice (array) of the names of the collections we can use the `GetCollNames` 
 function:
 
 ```go
@@ -103,7 +104,7 @@ func main() {
 }
 ```
 
-To get a collection we use the ```GetColl``` function:
+To get a collection we use the `GetColl` function:
 
 ```go
 func main() {
@@ -115,3 +116,21 @@ func main() {
     }
 }
 ```
+
+### Collection Operations And Query
+
+Once we get a collection from db we can add data to it. To add a document to a collection 
+we use the `Add` function:
+
+```go
+func main() {
+    // ...
+    _, err := ptrToAColl.Add(someData)
+    if err != nil {
+        panic(err)
+    }
+}
+```
+
+`Add` function returns `error` if something goes wrong. If no error is returned then adding
+is successful.
