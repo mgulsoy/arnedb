@@ -30,7 +30,7 @@ type QueryPredicate func(instance RecordInstance) bool
 type UpdateFunc func(ptrRecord *RecordInstance) *RecordInstance
 
 // Add Appends data into a collection
-func (coll *Coll) Add(data interface{}) (*Coll, error) {
+func (coll *Coll) Add(data interface{}) error {
 
 	// Kolleksiyonlar chunkXX.json adı verilen yığınlara ayrılır. Her bir yığın max 1 MB büyüklüğe kadar
 	// büyüyebilir.
@@ -38,45 +38,45 @@ func (coll *Coll) Add(data interface{}) (*Coll, error) {
 	payload, err := json.Marshal(data)
 	if err != nil {
 		// veriyi paketlemekte sorun
-		return coll, errors.New(fmt.Sprintf("cannot marshal data: %s", err.Error()))
+		return errors.New(fmt.Sprintf("cannot marshal data: %s", err.Error()))
 	}
 
 	// Coll var mı ona bakılır. Yoksa hata...
 	_, err = os.Stat(coll.dbpath)
 	if os.IsNotExist(err) {
-		return coll, errors.New(fmt.Sprintf("collection does not exist: %s", err.Error()))
+		return errors.New(fmt.Sprintf("collection does not exist: %s", err.Error()))
 	}
 
 	// Coll var. En son chunk bulunur.
 	lastChunk, err := coll.createChunk()
 	if err != nil {
-		return coll, err
+		return err
 	}
 
 	// Elimizde en son chunk var.
 	chunkPath := filepath.Join(coll.dbpath, (*lastChunk).Name())
 	f, err := os.OpenFile(chunkPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		return coll, errors.New(fmt.Sprintf("cannot open chunk to add data: %s", err.Error()))
+		return errors.New(fmt.Sprintf("cannot open chunk to add data: %s", err.Error()))
 	}
 
 	// Kayıt sonu karakteri eklenir
 	payload = append(payload, byte(recordSepChar))
 	write, err := f.Write(payload)
 	if err != nil {
-		return coll, errors.New(fmt.Sprintf("cannot append chunk: %s", err.Error()))
+		return errors.New(fmt.Sprintf("cannot append chunk: %s", err.Error()))
 	}
 
 	if write != len(payload) {
-		return coll, errors.New(fmt.Sprintf("append to chunk failed with: %d bytes diff", len(payload)-write))
+		return errors.New(fmt.Sprintf("append to chunk failed with: %d bytes diff", len(payload)-write))
 	}
 	err = f.Close()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("append failed to clos file: %s", err.Error()))
+		return errors.New(fmt.Sprintf("append failed to clos file: %s", err.Error()))
 	}
 
 	// işlem başarılı
-	return coll, nil
+	return nil
 }
 
 // AddAll appends multiple data into a collection. If one fails, no data will be committed to storage. Thus
@@ -86,17 +86,18 @@ func (coll *Coll) Add(data interface{}) (*Coll, error) {
 //
 // Or can be called like:
 //		AddAll(d1,d2,d3)
-func (coll *Coll) AddAll(data ...RecordInstance) (*Coll, error) {
+func (coll *Coll) AddAll(data ...RecordInstance) (int, error) {
 
+	n := 0
 	_, err := os.Stat(coll.dbpath)
 	if os.IsNotExist(err) {
-		return coll, errors.New(fmt.Sprintf("collection does not exist: %s", err.Error()))
+		return n, errors.New(fmt.Sprintf("collection does not exist: %s", err.Error()))
 	}
 
 	// Coll var. En son chunk bulunur.
 	lastChunk, err := coll.createChunk()
 	if err != nil {
-		return coll, err
+		return n, err
 	}
 
 	bufferStore := make([]byte, 512*len(data)) // her eleman için 512 byte ayır
@@ -109,13 +110,14 @@ func (coll *Coll) AddAll(data ...RecordInstance) (*Coll, error) {
 		payload, err := json.Marshal(dataElement)
 		if err != nil {
 			// veriyi paketlemekte sorun
-			return coll, errors.New(fmt.Sprintf("cannot marshal data: %s", err.Error()))
+			return 0, errors.New(fmt.Sprintf("cannot marshal data: %s", err.Error()))
 		}
 
 		// Tampon belleğe kaydı ekle
 		buffer.Write(payload)
 		// Kayıt sonu karakterini ekle
 		buffer.WriteString(recordSepStr)
+		n++
 	}
 
 	// Buraya kadar kod kırılmamışsa diske yazabiliriz.
@@ -123,23 +125,23 @@ func (coll *Coll) AddAll(data ...RecordInstance) (*Coll, error) {
 	chunkPath := filepath.Join(coll.dbpath, (*lastChunk).Name())
 	f, err := os.OpenFile(chunkPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
-		return coll, errors.New(fmt.Sprintf("cannot open chunk to add data: %s", err.Error()))
+		return 0, errors.New(fmt.Sprintf("cannot open chunk to add data: %s", err.Error()))
 	}
 
 	// Şimdilik yazılan byte sayısı ile ilgilenmiyoruz
 	_, err = buffer.WriteTo(f)
 	if err != nil {
 		_ = f.Close()
-		return coll, errors.New(fmt.Sprintf("cannot append chunk: %s", err.Error()))
+		return 0, errors.New(fmt.Sprintf("cannot append chunk: %s", err.Error()))
 	}
 
 	err = f.Close()
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("append failed to clos file: %s", err.Error()))
+		return 0, errors.New(fmt.Sprintf("append failed to close file: %s", err.Error()))
 	}
 
 	// işlem başarılı
-	return coll, nil
+	return n, nil
 }
 
 // GetFirst Queries and gets the first occurence of the query
@@ -430,11 +432,11 @@ func (coll *Coll) DeleteAll(predicate QueryPredicate) (n int, err error) {
 	return n, nil
 }
 
-// ReplaceSingle replaces the first occurence of the predicate result with the newData and returns
+// ReplaceFirst replaces the first occurence of the predicate result with the newData and returns
 // the number of updates. Obviously the return value is 1 if update successful and 0 if not.
 // Update is the most costly operation. The library does not provide a method to update parts of a
 // document since document is not known to the system.
-func (coll *Coll) ReplaceSingle(predicate QueryPredicate, newData interface{}) (n int, err error) {
+func (coll *Coll) ReplaceFirst(predicate QueryPredicate, newData interface{}) (n int, err error) {
 	return coll.replacer(predicate, newData, false)
 }
 
@@ -446,9 +448,9 @@ func (coll *Coll) ReplaceAll(predicate QueryPredicate, newData interface{}) (n i
 	return coll.replacer(predicate, newData, true)
 }
 
-// UpdateSingle updates the first occurance of predicate result in place with the data provided by the
+// UpdateFirst updates the first occurance of predicate result in place with the data provided by the
 // updateFunction
-func (coll *Coll) UpdateSingle(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
+func (coll *Coll) UpdateFirst(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
 	return coll.updater(predicate, updateFunction, false)
 }
 

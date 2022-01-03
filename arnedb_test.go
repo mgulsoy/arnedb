@@ -62,7 +62,7 @@ func TestCollectionOperations(t *testing.T) {
 	e1["user"] = "mert"
 	e1["unixtime"] = time.Now().Unix()
 
-	_, err = birinci.Add(e1)
+	err = birinci.Add(e1)
 	if err != nil {
 		t.Fatal("Add(1) Failed with: ", err)
 	}
@@ -72,7 +72,7 @@ func TestCollectionOperations(t *testing.T) {
 	e2["name"] = "hasan"
 	e2["user"] = "mert"
 	e2["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e2)
+	err = birinci.Add(e2)
 	if err != nil {
 		t.Fatal("Add(2) Failed with: ", err)
 	}
@@ -82,7 +82,7 @@ func TestCollectionOperations(t *testing.T) {
 	e3["name"] = "Multiline\ndata"
 	e3["user"] = "sülüman"
 	e3["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e3)
+	err = birinci.Add(e3)
 	if err != nil {
 		t.Fatal("Add(3) Failed with: ", err)
 	}
@@ -92,7 +92,7 @@ func TestCollectionOperations(t *testing.T) {
 	e4["name"] = "Mud,ata"
 	e4["user"] = "sülümanos 40"
 	e4["unixtime"] = time.Now().Unix()
-	_, err = birinci.Add(e4)
+	err = birinci.Add(e4)
 	if err != nil {
 		t.Fatal("Add(4) Failed with: ", err)
 	}
@@ -182,11 +182,11 @@ func TestCollectionOperations(t *testing.T) {
 	// Tümünü ekleme işlemi
 	dataArray := []RecordInstance{e1, e2, e3, e4}
 
-	_, err = birinci.AddAll(dataArray...)
+	nAddAll, err := birinci.AddAll(dataArray...)
 	if err != nil {
 		t.Error("Cannot 'AddAll'", err)
 	} else {
-		t.Log("AddAll successful.")
+		t.Logf("AddAll successful. %d records added.", nAddAll)
 	}
 
 	// Update
@@ -194,15 +194,15 @@ func TestCollectionOperations(t *testing.T) {
 		return instance["id"].(float64) == 34
 	}
 
-	e1["name"] = "ReplaceSingle yapıldı"
-	n, err = birinci.ReplaceSingle(ff, e1)
+	e1["name"] = "ReplaceFirst yapıldı"
+	n, err = birinci.ReplaceFirst(ff, e1)
 	if err != nil {
-		t.Error("Cannot ReplaceSingle:", err)
+		t.Error("Cannot ReplaceFirst:", err)
 	} else {
 		if n == 1 {
-			t.Log("ReplaceSingle successful.")
+			t.Log("ReplaceFirst successful.")
 		} else {
-			t.Error("ReplaceSingle did not return 1 as expected!")
+			t.Error("ReplaceFirst did not return 1 as expected!")
 		}
 	}
 
@@ -229,14 +229,14 @@ func TestCollectionOperations(t *testing.T) {
 		return ptrRecord
 	})
 
-	n, err = birinci.UpdateSingle(f36, fUpdt)
+	n, err = birinci.UpdateFirst(f36, fUpdt)
 	if err != nil {
-		t.Error("UpdateSingle failed")
+		t.Error("UpdateFirst failed")
 	} else {
 		if n == 0 {
-			t.Error("UpdateSingle returned 0 records updated. 1 expected")
+			t.Error("UpdateFirst returned 0 records updated. 1 expected")
 		} else {
-			t.Log("UpdateSingle successful.")
+			t.Log("UpdateFirst successful.")
 		}
 	}
 
