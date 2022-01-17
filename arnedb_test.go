@@ -6,6 +6,19 @@ import (
 	"time"
 )
 
+type SampleNestedType struct {
+	IntegerValue int
+	StringValue  string
+	FloatValue   float64
+}
+
+type SampleRecordType struct {
+	Id         int
+	Name       string
+	Nested     SampleNestedType
+	ArrayValue []string
+}
+
 func TestOpen(t *testing.T) {
 	pDb, err := Open("/tmp/arnedb", "testdb")
 
@@ -25,6 +38,12 @@ func TestCollectionOperations(t *testing.T) {
 		t.Fatal("Open test failed with:", err)
 	}
 
+	// Request a collection that is not present
+	nec := pDb.GetColl("non-existent")
+	if nec == nil {
+		t.Log("Request non-existent collection success")
+	}
+
 	// birinci adlı kolleksiyon oluşturulur
 	birinci, err := pDb.CreateColl("birinci")
 	if err != nil {
@@ -38,7 +57,7 @@ func TestCollectionOperations(t *testing.T) {
 	}
 
 	// üçüncü adlı kolleksiyon oluşturulur
-	_, err = pDb.CreateColl("üçüncü")
+	ucuncu, err := pDb.CreateColl("üçüncü")
 	if err != nil {
 		t.Error("Create üçüncü failed with:", err)
 	}
@@ -95,6 +114,28 @@ func TestCollectionOperations(t *testing.T) {
 	err = birinci.Add(e4)
 	if err != nil {
 		t.Fatal("Add(4) Failed with: ", err)
+	}
+
+	t1 := SampleRecordType{
+		Id:         12,
+		Name:       "First Sample Type Instance",
+		ArrayValue: []string{"one", "two", "three"},
+		Nested: SampleNestedType{
+			IntegerValue: 32,
+			StringValue:  "Nested string",
+			FloatValue:   32.45,
+		},
+	}
+
+	t2 := SampleRecordType{
+		Id:         13,
+		Name:       "Second Sample Type Instance",
+		ArrayValue: []string{"four", "five", "six"},
+		Nested: SampleNestedType{
+			IntegerValue: 52,
+			StringValue:  "Another nested string",
+			FloatValue:   12.3456,
+		},
 	}
 
 	// Veri sorgulanır:
@@ -258,4 +299,63 @@ func TestCollectionOperations(t *testing.T) {
 			t.Log("UpdateAll successful.")
 		}
 	}
+
+	// typed structure tests
+	err = ucuncu.Add(t1)
+	if err != nil {
+		t.Fatal("Failed adding typed structure t1:", err.Error())
+	}
+
+	err = ucuncu.Add(t2)
+	if err != nil {
+		t.Fatal("Failed adding typed structure t2:", err.Error())
+	}
+
+	t.Log("t1 and t1 Add success")
+
+	//Query typed structure
+	var rt1 SampleRecordType
+	var rtPredicate = func(instance interface{}) bool {
+		//fmt.Println("type of instance: ", reflect.TypeOf(instance))
+		i := instance.(*SampleRecordType) // this typecast is required
+		return i.Id == 13
+	}
+	found, err := ucuncu.GetFirstAsInterface(rtPredicate, &rt1)
+	if err != nil {
+		t.Fatal("Error on interface request:", err.Error())
+	}
+
+	if found {
+		t.Logf("Record found: %+v", rt1)
+	} else {
+		t.Log("Record not found.")
+	}
+
+	var rt2Predicate = func(instance interface{}) bool {
+		//fmt.Println("type of instance: ", reflect.TypeOf(instance))
+		//i := instance.(*SampleRecordType) // this typecast is required
+		return true
+	}
+
+	var resultCollection = make([]SampleRecordType, 0)
+	var rt2FoundCallback = func(instance interface{}) bool {
+		i := *instance.(*SampleRecordType)
+		resultCollection = append(resultCollection, i)
+		return true
+	}
+
+	n, err = ucuncu.GetAllAsInterface(rt2Predicate, rt2FoundCallback, &rt1)
+	if err != nil {
+		t.Fatal("Error on interface request:", err.Error())
+	}
+
+	if n > 0 {
+		t.Logf("%d Records found: %+v", n, resultCollection)
+		for _, k := range resultCollection {
+			t.Logf("\t -> %+v", k)
+		}
+	} else {
+		t.Log("Record not found.")
+	}
+
 }

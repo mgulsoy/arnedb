@@ -3,9 +3,9 @@
 // There are a lot of database products which can achieve high performance. Arnedb provides a
 // lightweight database implementation which is embeddable in any GO app. Design goals of Arnedb
 // are:
-// 		Low memory usage: Can be run in resource constrained environments
-//		Simplicity: Hence the name implies
-//		Text file storage: All the data is stored in text based JSON files
+// * Low memory usage: Can be run in resource constrained environments
+// * Simplicity: Hence the title implies
+// * Text file storage: All the data is stored in text based JSON files
 package arnedb
 
 import (
@@ -16,19 +16,23 @@ import (
 	"path/filepath"
 )
 
+// Coll represents a single collection of documents. There is no limit for collections
 type Coll struct {
 	dbpath string // Kolleksiyon klasörünün yolu.
-	Name   string // Kolleksiyon adı
+	// Name is the collection name.
+	Name string
 }
 
+// ArneDB represents a single database. There is no limit for databases. (Unless you have enough disk space)
 type ArneDB struct {
+	// Name is the database name
+	Name    string
 	baseDir string           // Veritabanı ana klasörü,
-	Name    string           // Veritabanı adı
 	path    string           // Veritabanı tam yolu
 	colls   map[string]*Coll // içindeki Coll'lar (Kolleksiyonlar)
 }
 
-// Open Opens an existing or creates a new database.
+// Open function opens an existing or creates a new database.
 func Open(baseDir, dbName string) (*ArneDB, error) {
 
 	// baseDir var mı? Yoksa oluştur.
@@ -101,7 +105,7 @@ func Open(baseDir, dbName string) (*ArneDB, error) {
 
 // Collection İşlemleri ---------------------------------------------------------------
 
-// CreateColl  Creates a collection and returns it.
+// CreateColl function creates a collection and returns it.
 func (db *ArneDB) CreateColl(collName string) (*Coll, error) {
 	// Oluşturulmak istenen collection var mı ona bakarız.
 	collPath := filepath.Join(db.path, collName)
@@ -126,7 +130,7 @@ func (db *ArneDB) CreateColl(collName string) (*Coll, error) {
 	return &c, nil
 }
 
-// DeleteColl Deletes a given collection.
+// DeleteColl function deletes a given collection.
 func (db *ArneDB) DeleteColl(collName string) error {
 	collObj, keyFound := db.colls[collName]
 	if !keyFound {

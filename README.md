@@ -218,6 +218,91 @@ func main() {
 
 If the predicate does not match any records, the function returns an empty slice.
 
+There is also `GetFirstAsInterface` function. This function tries to return data as a struct
+used in the application. This function works a little different with the `GetFirst` function.
+Check the example:
+
+```go
+type SomeDataType stuct {
+	Id              int
+	SomeValue       string
+	SomeOtherValue  float64
+}
+
+func main() {
+	// ...
+	
+	var dataHolder SomeDataType
+	var queryPredicate = func(instance interface{}) bool {
+        i := instance.(*SomeDataType) // this typecast is required
+        return i.Id == 13
+    }
+
+    // The holder (3rd) parameter must be an address of a variable
+    found, err := ptrToAColl.GetFirstAsInterface(queryPredicate, &dataHolder)
+	if err != nil {
+		//handle error
+		// ...
+    }
+	if found {
+		// data found. You can reach the data with dataHolder
+		fmt.Println("Data: ", dataHolder)
+		// ...
+    } else {
+		// Not found, no match
+		// if so dataHolder will be nil
+		// handle this state ...
+    }
+}
+```
+
+There is also `GetAllAsInterface` function. This function hands the found document to an
+argument named `harvestCallback`. This is a callback function. Inside this function you
+can harvest the data as you wish. Check the example:
+
+```go
+type SomeDataType stuct {
+	Id              int
+	SomeValue       string
+	SomeOtherValue  float64
+}
+
+func main() {
+	
+    // ...
+	
+    var dataHolder SomeDataType
+    var queryPredicate = func(instance interface{}) bool {
+        i := instance.(*SomeDataType) // this typecast is required
+        return i.Id > 0
+    }
+
+    var resultCollection = make([]SomeDataType,0) // create an empty slice
+    var harvestCB = func(instance interface{}) bool {
+        // this is a double indirection. Please pay attention to the * operators!
+        i := *instance.(*SomeDataType) // this typecast is required
+        resultCollection = append(resultCollection, i) // harvest as you need
+        return true // always return true
+    }
+	
+	// The holder (3rd) parameter must be an address of a variable!
+    count, err := ptrToAColl.GetAllAsInterface(queryPredicate, harvestCB, &dataHolder)
+    if err != nil {
+       //handle error
+       // ...
+    }
+    if count > 0 {
+        // query result will be in resultCollection
+        fmt.Println("Data: ", resultCollection)
+        // ...
+    } else {
+        // Not found, no match
+        // if so resultCollection will be empty
+        // handle this state ...
+    }
+}
+```
+
 #### Manipulation
 
 We can delete records by using `DeleteFirst` and `DeleteAll` functions. The functions accept

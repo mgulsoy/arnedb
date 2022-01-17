@@ -20,16 +20,19 @@ const maxChunkSize = 1024 * 1024 // 1MB
 const recordSepChar = 10         // --> \n
 const recordSepStr = "\n"
 
-// RecordInstance A record instance read from data file
+// RecordInstance represents a record instance read from data file. It is actually a map.
 type RecordInstance map[string]interface{}
 
-// QueryPredicate a function type receiving row instance and returning bool
+// QueryPredicate is a function type receiving row instance and returning bool
 type QueryPredicate func(instance RecordInstance) bool
+
+// QueryPredicateAsInterface is a function type receiving record instance as given type and returning bool
+type QueryPredicateAsInterface func(instance interface{}) bool
 
 // UpdateFunc alters the data matched by predicate
 type UpdateFunc func(ptrRecord *RecordInstance) *RecordInstance
 
-// Add Appends data into a collection
+// Add function appends data into a collection
 func (coll *Coll) Add(data interface{}) error {
 
 	// Kolleksiyonlar chunkXX.json adı verilen yığınlara ayrılır. Her bir yığın max 1 MB büyüklüğe kadar
@@ -79,8 +82,9 @@ func (coll *Coll) Add(data interface{}) error {
 	return nil
 }
 
-// AddAll appends multiple data into a collection. If one fails, no data will be committed to storage. Thus
+// AddAll function appends multiple data into a collection. If one fails, no data will be committed to storage. Thus,
 // this function acts like a transaction. This function is a variadic function which accepts a SLICE as an argument:
+//
 //		d := []RecordInstance{ a, b, c}
 //		AddAll(d...)
 //
@@ -144,7 +148,8 @@ func (coll *Coll) AddAll(data ...RecordInstance) (int, error) {
 	return n, nil
 }
 
-// GetFirst Queries and gets the first occurence of the query
+// GetFirst function queries and gets the first match of the query.
+// The function returns nil if no data found.
 func (coll *Coll) GetFirst(predicate QueryPredicate) (result RecordInstance, err error) {
 	chunks, err := coll.getChunks()
 	if err != nil {
@@ -202,7 +207,73 @@ func (coll *Coll) GetFirst(predicate QueryPredicate) (result RecordInstance, err
 	return nil, nil
 }
 
-// GetAll Queries and gets all instances of the query
+// GetFirstAsInterface function queries and gets the first match of the query. The query result can be found in the
+// holder argument. The function returns a boolean value indicating data is found or not.
+func (coll *Coll) GetFirstAsInterface(predicate QueryPredicateAsInterface, holder interface{}) (found bool, err error) {
+	chunks, err := coll.getChunks()
+	if err != nil {
+		return false, err // marks not found
+	}
+
+	if len(chunks) == 0 {
+		// İçeride hiç veri yok
+		return false, nil // no data
+	}
+
+	var f *os.File
+	// Burada predicate içinde oluşabilecek olan hatayı yakalarız.
+	// Hata olursa isimli return value'ları buna göre düzenleriz.
+	defer func() {
+		if r := recover(); r != nil {
+			//fmt.Errorf("recover??? %+v", r)
+			found = false
+			err = errors.New(fmt.Sprintf("predicate error: %s", r.(error).Error()))
+			if f != nil { // dosya kapanmamışsa kapat
+				_ = f.Close()
+			}
+		}
+	}()
+
+	for _, chunk := range chunks {
+		// Veri aranır. Bunun için bütün chunklara bakılır
+		chunkPath := filepath.Join(coll.dbpath, chunk.Name())
+		f, err = os.Open(chunkPath)
+		if err != nil {
+			return false, err
+		}
+
+		scn := bufio.NewScanner(f)
+		dataMatched := false
+		for scn.Scan() {
+			line := scn.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+			err = json.Unmarshal(line, holder)
+			if err != nil {
+				// error on unmarshal operation
+				continue // skip this record
+			}
+			el := holder
+			dataMatched = predicate(el) // evaluate predicate
+			if dataMatched {
+				found = true
+				break
+			}
+		}
+		_ = f.Close() // TODO: Handle error
+		f = nil       // temizle
+		if dataMatched {
+			return true, nil
+		}
+	}
+
+	holder = nil // reset holder.
+
+	return false, nil
+}
+
+// GetAll function queries and gets all the matches of the query predicate.
 func (coll *Coll) GetAll(predicate QueryPredicate) (result []RecordInstance, err error) {
 
 	chunks, err := coll.getChunks()
@@ -260,8 +331,72 @@ func (coll *Coll) GetAll(predicate QueryPredicate) (result []RecordInstance, err
 	return result, nil
 }
 
-// DeleteFirst Deletes the first occurence of the predicate result and returns the number of deleted
-// records. n = 1 if a deletion occured, n = 0 if none.
+// GetAllAsInterface function queries and gets all the matches of the query predicate. Returns the
+// number of record found or 0 if not. Data is sent into harvestCallback function. So you can harvest
+// the data. There is no generics in GO. So user must handle the type conversion.
+func (coll *Coll) GetAllAsInterface(predicate QueryPredicateAsInterface, harvestCallback QueryPredicateAsInterface, holder interface{}) (n int, err error) {
+
+	n = 0 // init
+	chunks, err := coll.getChunks()
+	if err != nil {
+		return n, err
+	}
+
+	if len(chunks) == 0 {
+		// İçeride hiç veri yok
+		return n, nil
+	}
+
+	var f *os.File
+	// Burada predicate içinde oluşabilecek olan hatayı yakalarız.
+	// Hata olursa isimli return value'ları buna göre düzenleriz.
+	defer func() {
+		if r := recover(); r != nil {
+			//fmt.Errorf("recover??? %+v", r)
+			n = 0
+			err = errors.New(fmt.Sprintf("predicate error: %s", r.(error).Error()))
+			if f != nil { // dosya kapanmamışsa kapat
+				_ = f.Close()
+			}
+		}
+	}()
+
+	dataMatched := false
+	for _, chunk := range chunks {
+		// Veri aranır. Bunun için bütün chunklara bakılır
+		chunkPath := filepath.Join(coll.dbpath, chunk.Name())
+		f, err = os.Open(chunkPath)
+		if err != nil {
+			return 0, err
+		}
+
+		scn := bufio.NewScanner(f)
+		for scn.Scan() {
+			line := scn.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+
+			err = json.Unmarshal(line, holder) // TODO: Handle error
+			if err != nil {
+				// if an error occurs skip it
+				continue
+			}
+			dataMatched = predicate(holder)
+			if dataMatched {
+				harvestCallback(holder)
+				n++
+			}
+		}
+		_ = f.Close() // TODO: Handle error
+		f = nil       // temizle
+	}
+
+	return n, nil
+}
+
+// DeleteFirst function deletes the first match of the predicate and returns the count of deleted
+// records. n = 1 if a deletion occurred, n = 0 if none.
 func (coll *Coll) DeleteFirst(predicate QueryPredicate) (n int, err error) {
 	chunks, err := coll.getChunks()
 	n = 0
@@ -348,8 +483,8 @@ func (coll *Coll) DeleteFirst(predicate QueryPredicate) (n int, err error) {
 	return n, nil
 }
 
-// DeleteAll Deletes all matches of the predicate and returns the number of deletions.
-// n = 0 if no deletions occured.
+// DeleteAll function deletes all the matches of the predicate and returns the count of deletions.
+// n = 0 if no deletions occurred.
 func (coll *Coll) DeleteAll(predicate QueryPredicate) (n int, err error) {
 	chunks, err := coll.getChunks()
 	n = 0
@@ -432,29 +567,29 @@ func (coll *Coll) DeleteAll(predicate QueryPredicate) (n int, err error) {
 	return n, nil
 }
 
-// ReplaceFirst replaces the first occurence of the predicate result with the newData and returns
-// the number of updates. Obviously the return value is 1 if update successful and 0 if not.
+// ReplaceFirst replaces the first match of the predicate with the newData and returns
+// the count of updates. Obviously the return value is 1 if update is successful and 0 if not.
 // Update is the most costly operation. The library does not provide a method to update parts of a
 // document since document is not known to the system.
 func (coll *Coll) ReplaceFirst(predicate QueryPredicate, newData interface{}) (n int, err error) {
 	return coll.replacer(predicate, newData, false)
 }
 
-// ReplaceAll replaces all the occurances of the predicate result with the newData and returns the
-// number of updates.
+// ReplaceAll replaces all the matches of the predicate with the newData and returns the
+// count of updates.
 // Replace is the most costly operation. The library does not provide a method to update parts of a
 // document since document is not known to the system.
 func (coll *Coll) ReplaceAll(predicate QueryPredicate, newData interface{}) (n int, err error) {
 	return coll.replacer(predicate, newData, true)
 }
 
-// UpdateFirst updates the first occurance of predicate result in place with the data provided by the
+// UpdateFirst updates the first match of predicate in place with the data provided by the
 // updateFunction
 func (coll *Coll) UpdateFirst(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
 	return coll.updater(predicate, updateFunction, false)
 }
 
-// UpdateAll updates all of the occurances of the predicate result in place with the data provided by the
+// UpdateAll updates all the matches of the predicate in place with the data provided by the
 // updateFunction
 func (coll *Coll) UpdateAll(predicate QueryPredicate, updateFunction UpdateFunc) (n int, err error) {
 	return coll.updater(predicate, updateFunction, true)
@@ -688,7 +823,7 @@ func (coll *Coll) createChunk() (*fs.FileInfo, error) {
 	return lastChunk, nil
 }
 
-// getChunks Checks disk storage and returns the chunk files if any.
+// getChunks checks disk storage and returns the chunk files if any.
 func (coll *Coll) getChunks() ([]fs.FileInfo, error) {
 	fileElements, err := ioutil.ReadDir(coll.dbpath)
 	if err != nil {
@@ -711,7 +846,7 @@ func (coll *Coll) getChunks() ([]fs.FileInfo, error) {
 	return resultArray[:idx], nil
 }
 
-// getLastChunk Returns a chunk to store data if there are any.
+// getLastChunk returns a chunk to store data if there are any.
 func (coll *Coll) getLastChunk() (*fs.FileInfo, error) {
 	chunks, err := ioutil.ReadDir(coll.dbpath)
 	if err != nil {
