@@ -331,6 +331,62 @@ func (coll *Coll) GetAll(predicate QueryPredicate) (result []RecordInstance, err
 	return result, nil
 }
 
+// Count function returns the count of matched records with the predicate function
+func (coll *Coll) Count(predicate QueryPredicate) (n int, err error) {
+	n = 0
+	chunks, err := coll.getChunks()
+	if err != nil {
+		return n, err
+	}
+
+	if len(chunks) == 0 {
+		// İçeride hiç veri yok
+		return n, nil
+	}
+
+	var f *os.File
+	// Burada predicate içinde oluşabilecek olan hatayı yakalarız.
+	// Hata olursa isimli return value'ları buna göre düzenleriz.
+	defer func() {
+		if r := recover(); r != nil {
+			//fmt.Errorf("recover??? %+v", r)
+			n = 0
+			err = errors.New(fmt.Sprintf("predicate error: %s", r.(error).Error()))
+			if f != nil { // dosya kapanmamışsa kapat
+				_ = f.Close()
+			}
+		}
+	}()
+
+	dataMatched := false
+	for _, chunk := range chunks {
+		// Veri aranır. Bunun için bütün chunklara bakılır
+		chunkPath := filepath.Join(coll.dbpath, chunk.Name())
+		f, err = os.Open(chunkPath)
+		if err != nil {
+			return 0, err
+		}
+
+		scn := bufio.NewScanner(f)
+		for scn.Scan() {
+			line := scn.Bytes()
+			if len(line) == 0 {
+				continue
+			}
+			var data RecordInstance
+			_ = json.Unmarshal(line, &data) // TODO: Handle error
+			dataMatched = predicate(data)
+			if dataMatched {
+				n++
+			}
+		}
+		_ = f.Close() // TODO: Handle error
+		f = nil       // cleanup
+	}
+
+	return n, nil
+}
+
 // GetAllAsInterface function queries and gets all the matches of the query predicate. Returns the
 // number of record found or 0 if not. Data is sent into harvestCallback function. So you can harvest
 // the data. There is no generics in GO. So user must handle the type conversion.

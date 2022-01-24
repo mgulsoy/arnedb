@@ -232,26 +232,27 @@ type SomeDataType stuct {
 func main() {
 	// ...
 	
-	var dataHolder SomeDataType
-	var queryPredicate = func(instance interface{}) bool {
+    var dataHolder SomeDataType
+    var queryPredicate = func(instance interface{}) bool {
         i := instance.(*SomeDataType) // this typecast is required
         return i.Id == 13
     }
 
     // The holder (3rd) parameter must be an address of a variable
     found, err := ptrToAColl.GetFirstAsInterface(queryPredicate, &dataHolder)
-	if err != nil {
-		//handle error
-		// ...
+    if err != nil {
+        //handle error
+        // ...
     }
-	if found {
-		// data found. You can reach the data with dataHolder
-		fmt.Println("Data: ", dataHolder)
-		// ...
+
+    if found {
+        // data found. You can reach the data with dataHolder
+        fmt.Println("Data: ", dataHolder)
+        // ...
     } else {
-		// Not found, no match
-		// if so dataHolder will be nil
-		// handle this state ...
+        // Not found, no match
+        // if so dataHolder will be nil
+        // handle this state ...
     }
 }
 ```
@@ -299,6 +300,26 @@ func main() {
         // Not found, no match
         // if so resultCollection will be empty
         // handle this state ...
+    }
+}
+```
+
+If you want to get the count of the documents stored, there is the `Count` function. 
+Here is an example of how to use it:
+
+```go
+func main() {
+	
+    queryPredicate := func(q RecordInstance) bool {
+       return true // we want to count all the records. You can also give conditions here.	
+    }
+	
+    n, err := ptrToAColl.Count(queryPredicate)
+    if err != nil {
+        // handle error...
+    } else {
+       // no error
+       fmt.Println("Record count:",n)
     }
 }
 ```

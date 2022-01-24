@@ -1,6 +1,7 @@
 package arnedb
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -114,6 +115,18 @@ func TestCollectionOperations(t *testing.T) {
 	err = birinci.Add(e4)
 	if err != nil {
 		t.Fatal("Add(4) Failed with: ", err)
+	}
+
+	// Get the count of 'birinci' collection
+	qCount := func(q RecordInstance) bool {
+		return true
+	}
+
+	bcount, err := birinci.Count(qCount)
+	if err != nil {
+		t.Error("Failed to get count: ", err.Error())
+	} else {
+		t.Log(fmt.Sprintf("Expected count: %d", bcount))
 	}
 
 	t1 := SampleRecordType{
