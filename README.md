@@ -14,7 +14,7 @@ The design goals of Arnedb are:
 
 ### Minimum Go Version
 
-Go 1.17+
+Go 1.19+
 
 ## Overview
 
@@ -24,6 +24,8 @@ Go 1.17+
     * [Collection Operations And Query](#collection-operations-and-query)
         * [Adding Documents](#adding-documents)
         * [Querying](#querying)
+          * [GetFirst](#getfirst)
+          * [GetAll](#getall)
         * [Manipulation](#manipulation)
 
 # Installation
@@ -162,7 +164,21 @@ at once.
 
 After adding data, we need to query and get the data from the store. There is no special
 query language. Query mechanism works with the predicate functions. The operation is similar
-to the LINQ. To get a single data we use the `GetFirst` function. This function runs the
+to the LINQ. A `Coll` provides these methods:
+
+* [GetFirst](*getfirst)
+* [GetAll](*getall)
+* [GetFirstAsInterface](#getfirstasinterface)
+* [GetAllAsInterface](#getallasinterface)
+* [Count](#count)
+
+Also there are function from the package using generics:
+* [GetFirstAs](#getfirstas)
+* [GetAllAs](#getallas)
+
+
+##### GetFirst
+To get a single data we use the `GetFirst` function. This function runs the
 predicate and returns the first match in a collection. The predicate function signature
 must match the `QueryPredicate` type.
 
@@ -191,6 +207,7 @@ func main() {
 
 The function returns `nil` if there is no match.
 
+##### GetAll
 If we want to get all the records that the predicate match, we use the `GetAll` function.
 
 ```go
@@ -218,6 +235,7 @@ func main() {
 
 If the predicate does not match any records, the function returns an empty slice.
 
+##### GetFirstAsInterface
 There is also `GetFirstAsInterface` function. This function tries to return data as a struct
 used in the application. This function works a little different with the `GetFirst` function.
 Check the example:
@@ -257,6 +275,7 @@ func main() {
 }
 ```
 
+##### GetAllAsInterface
 There is also `GetAllAsInterface` function. This function hands the found document to an
 argument named `harvestCallback`. This is a callback function. Inside this function you
 can harvest the data as you wish. Check the example:
@@ -304,6 +323,7 @@ func main() {
 }
 ```
 
+##### Count
 If you want to get the count of the documents stored, there is the `Count` function. 
 Here is an example of how to use it:
 
@@ -321,6 +341,76 @@ func main() {
        // no error
        fmt.Println("Record count:",n)
     }
+}
+```
+
+##### GetFirstAs
+This is a function from the package. This function works like [GetFirstAsInterface](#getfirstasinterface) method.
+But this function uses generics and easier to query. The predicate function must have one argument
+which is a pointer to generic type and must return bool. If a record is found then the record
+pointer is returned. If nothing found then nil returned.
+
+```go
+type SomeDataType stuct {
+    Id              int
+    SomeValue       string
+    SomeOtherValue  float64
+}
+
+func main() {
+    // ...
+	
+    record, err := arnedb.GetFirstAs[SomeDataType](ptrToAColl, func(i *SomeDataType) bool{
+        return i.Id == 455
+    })
+    if err != nil {
+        //handle error
+        // ...
+    } else {
+        //if there is no error
+        if record == nil {
+            // no records found.	
+        } else {
+            // found record
+        }
+    }
+
+    
+}
+```
+
+##### GetAllAs
+This is a function from the package. This function works like [GetAllAsInterface](#getallasinterface) method.
+But this function uses generics and easier to query. The predicate function must have one argument
+which is a pointer to generic type and must return bool. If a record is found then the record
+pointer is returned. If nothing found then nil returned.
+
+```go
+type SomeDataType stuct {
+    Id              int
+    SomeValue       string
+    SomeOtherValue  float64
+}
+
+func main() {
+    // ...
+	
+    records, err := arnedb.GetAllAs[SomeDataType](ptrToAColl, func(i *SomeDataType) bool{
+        return i.SomeOtherValue > 12
+    })
+    if err != nil {
+        //handle error
+        // ...
+    } else {
+        //if there is no error
+        if len(records)==0 {
+            // no records found.	
+        } else {
+            // found record
+        }
+    }
+
+    
 }
 ```
 

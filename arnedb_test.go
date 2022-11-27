@@ -326,6 +326,31 @@ func TestCollectionOperations(t *testing.T) {
 
 	t.Log("t1 and t1 Add success")
 
+	recordAs, err := GetFirstAs[SampleRecordType](ucuncu, func(i *SampleRecordType) bool {
+		return i.Id == 13
+	})
+	if err != nil {
+		t.Fatal("Error on generics request:", err.Error())
+	} else {
+		if recordAs != nil {
+			t.Log("GetFirstAs: ", recordAs.Id, recordAs.Name, " Success")
+		} else {
+			t.Log("GetFirstAs: No records found. Success")
+		}
+
+	}
+
+	startMark := time.Now()
+	recordsAs, err := GetAllAs[SampleRecordType](ucuncu, func(i *SampleRecordType) bool {
+		return true // we want all
+	})
+	if err != nil {
+		t.Fatal("Error on generics get all: ", err.Error())
+	} else {
+		diff := time.Now().Sub(startMark)
+		t.Log("Success GetAllAs. Len: ", len(recordsAs), diff)
+	}
+
 	//Query typed structure
 	var rt1 SampleRecordType
 	var rtPredicate = func(instance interface{}) bool {
@@ -344,6 +369,7 @@ func TestCollectionOperations(t *testing.T) {
 		t.Log("Record not found.")
 	}
 
+	startMark = time.Now()
 	var rt2Predicate = func(instance interface{}) bool {
 		//fmt.Println("type of instance: ", reflect.TypeOf(instance))
 		//i := instance.(*SampleRecordType) // this typecast is required
@@ -363,12 +389,36 @@ func TestCollectionOperations(t *testing.T) {
 	}
 
 	if n > 0 {
-		t.Logf("%d Records found: %+v", n, resultCollection)
+		diff := time.Now().Sub(startMark)
+		t.Logf("%d Records found: %T, %s", n, resultCollection, diff)
 		for _, k := range resultCollection {
-			t.Logf("\t -> %+v", k)
+			t.Logf("\t ->%T : %+v", k, k)
 		}
 	} else {
 		t.Log("Record not found.")
+	}
+
+}
+
+func BenchmarkMemAndGenerics(b *testing.B) {
+	b.ReportAllocs()
+	pDb, err := Open("/tmp/arnedb", "testdb")
+	if pDb == nil || err != nil {
+		b.Fatal("Open test failed with:", err)
+	}
+
+	ucuncu := pDb.GetColl("üçüncü")
+	if ucuncu == nil {
+		b.Error("Create üçüncü failed with:", err)
+	}
+
+	recordAs, err := GetFirstAs[SampleRecordType](ucuncu, func(i *SampleRecordType) bool {
+		return i.Id == 36
+	})
+	if err != nil {
+		b.Fatal("Error on interface request:", err.Error())
+	} else {
+		b.Log("GetFirstAs: ", recordAs.Id, recordAs.Name, " Success")
 	}
 
 }

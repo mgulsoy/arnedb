@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -85,11 +86,12 @@ func (coll *Coll) Add(data interface{}) error {
 // AddAll function appends multiple data into a collection. If one fails, no data will be committed to storage. Thus,
 // this function acts like a transaction. This function is a variadic function which accepts a SLICE as an argument:
 //
-//		d := []RecordInstance{ a, b, c}
-//		AddAll(d...)
+//	d := []RecordInstance{ a, b, c}
+//	AddAll(d...)
 //
 // Or can be called like:
-//		AddAll(d1,d2,d3)
+//
+//	AddAll(d1,d2,d3)
 func (coll *Coll) AddAll(data ...RecordInstance) (int, error) {
 
 	n := 0
@@ -205,6 +207,129 @@ func (coll *Coll) GetFirst(predicate QueryPredicate) (result RecordInstance, err
 	}
 
 	return nil, nil
+}
+
+// GetFirstAs function queries given coll and gets the first match of the query. This function uses generics.
+// Returns nil if no data found.
+func GetFirstAs[T any](coll *Coll, predicate func(i *T) bool) (result *T, err error) {
+	chunks, err := coll.getChunks()
+	if err != nil {
+		return nil, err // marks not found
+	}
+
+	if len(chunks) == 0 {
+		// İçeride hiç veri yok
+		return nil, nil // no data
+	}
+
+	var f *os.File
+	defer func() { // predicate içindeki hatayı yakala
+		if r := recover(); r != nil {
+			//fmt.Errorf("recover??? %+v", r)
+			err = errors.New(fmt.Sprintf("predicate error: %s", r.(error).Error()))
+			if f != nil { // dosya kapanmamışsa kapat
+				_ = f.Close()
+			}
+		}
+	}()
+
+	for _, chunk := range chunks {
+		// Veri aranır. Bunun için bütün chunklara bakılır
+		chunkPath := filepath.Join(coll.dbpath, chunk.Name())
+		f, err = os.Open(chunkPath)
+		if err != nil {
+			return nil, err
+		}
+
+		dec := json.NewDecoder(f)
+		var m T
+		predicateResult := false
+		for {
+			err = dec.Decode(&m)
+			if err == io.EOF {
+				// eof
+				break
+			} else if err != nil {
+				//return false, err
+				continue // skip this record
+			}
+			predicateResult = predicate(&m)
+			if predicateResult == true {
+				break
+			}
+		}
+
+		_ = f.Close() // TODO: Handle error
+		f = nil       // temizle
+
+		if predicateResult == true {
+			return &m, nil
+		}
+	}
+
+	return nil, nil
+
+}
+
+// GetAllAs function queries given coll and returns all for the predicate match. This function uses generics.
+// Returns a slice of data pointers. If nothing is found then empty slice is returned
+func GetAllAs[T any](coll *Coll, predicate func(i *T) bool) (result []*T, err error) {
+	chunks, err := coll.getChunks()
+	if err != nil {
+		return nil, err // marks not found
+	}
+
+	result = make([]*T, 0) // sonuç için bir kolleksiyon ayarla
+
+	if len(chunks) == 0 {
+		// İçeride hiç veri yok
+		return result, nil // no data
+	}
+
+	var f *os.File
+	defer func() { // predicate içindeki hatayı yakala
+		if r := recover(); r != nil {
+			//fmt.Errorf("recover??? %+v", r)
+			err = errors.New(fmt.Sprintf("predicate error: %s", r.(error).Error()))
+			if f != nil { // dosya kapanmamışsa kapat
+				_ = f.Close()
+			}
+		}
+	}()
+
+	for _, chunk := range chunks {
+		// Veri aranır. Bunun için bütün chunklara bakılır
+		chunkPath := filepath.Join(coll.dbpath, chunk.Name())
+		f, err = os.Open(chunkPath)
+		if err != nil {
+			return nil, err
+		}
+
+		dec := json.NewDecoder(f)
+		predicateResult := false
+		for {
+			var m T
+			err = dec.Decode(&m)
+			if err == io.EOF {
+				// eof
+				break
+			} else if err != nil {
+				//return false, err
+				continue // skip this record
+			}
+			predicateResult = predicate(&m)
+			if predicateResult == true {
+				result = append(result, &m)
+			}
+		}
+
+		_ = f.Close() // TODO: Handle error
+		f = nil       // temizle
+
+		return result, nil
+	}
+
+	return result, nil
 }
 
 // GetFirstAsInterface function queries and gets the first match of the query. The query result can be found in the
