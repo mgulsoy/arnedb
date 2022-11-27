@@ -26,6 +26,11 @@ Go 1.19+
         * [Querying](#querying)
           * [GetFirst](#getfirst)
           * [GetAll](#getall)
+	  * [GetFirstAsInterface](#getfirstasinterface)
+	  * [GetAllAsInterface](#getallasinterface)
+	  * [Count](#count)
+	  * [GetFirstAs](#getfirstas)
+	  * [GetAllAs](#getallas)
         * [Manipulation](#manipulation)
 
 # Installation
