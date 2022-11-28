@@ -1,4 +1,4 @@
-# ArneDB
+# ArneDB [![Go Report Card](https://goreportcard.com/badge/github.com/mgulsoy/arnedb)](https://goreportcard.com/report/github.com/mgulsoy/arnedb)
 ArneDB is an embedded document (NoSql) database. There is no server implementation.
 Just import the package and GO.
 
