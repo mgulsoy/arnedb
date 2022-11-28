@@ -1,5 +1,5 @@
 # ArneDB [![Go Report Card](https://goreportcard.com/badge/github.com/mgulsoy/arnedb)](https://goreportcard.com/report/github.com/mgulsoy/arnedb)
-ArneDB is an embedded document (NoSql) database. There is no server implementation.
+ArneDB is an embedded document (NoSql) database implemented in pure GO. There is no server implementation.
 Just import the package and GO.
 
 ArneDB is not a high-performance database. There are a lot of database products which
