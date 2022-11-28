@@ -21,7 +21,7 @@ type SampleRecordType struct {
 }
 
 func TestOpen(t *testing.T) {
-	pDb, err := Open("/tmp/arnedb", "testdb")
+	pDb, err := Open("testdb", "testdb")
 
 	if pDb == nil || err != nil {
 		t.Fatal("Open test failed with:", err)
@@ -31,10 +31,10 @@ func TestOpen(t *testing.T) {
 
 func TestCollectionOperations(t *testing.T) {
 
-	_ = os.RemoveAll("/tmp/arnedb/testdb")
+	_ = os.RemoveAll("testdb/testdb")
 
 	// Veritabanı open yapılır
-	pDb, err := Open("/tmp/arnedb", "testdb")
+	pDb, err := Open("testdb", "testdb")
 	if pDb == nil || err != nil {
 		t.Fatal("Open test failed with:", err)
 	}
@@ -402,7 +402,7 @@ func TestCollectionOperations(t *testing.T) {
 
 func BenchmarkMemAndGenerics(b *testing.B) {
 	b.ReportAllocs()
-	pDb, err := Open("/tmp/arnedb", "testdb")
+	pDb, err := Open("testdb", "testdb")
 	if pDb == nil || err != nil {
 		b.Fatal("Open test failed with:", err)
 	}
