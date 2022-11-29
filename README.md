@@ -1,4 +1,4 @@
-# ArneDB [![Go Report Card](https://goreportcard.com/badge/github.com/mgulsoy/arnedb)](https://goreportcard.com/report/github.com/mgulsoy/arnedb) [![codecov](https://codecov.io/github/mgulsoy/arnedb/branch/main/graph/badge.svg?token=5JRV5PE5CC)](https://codecov.io/github/mgulsoy/arnedb) ![test](https://github.com/mgulsoy/arnedb/actions/workflows/go.yml/badge.svg)
+# ArneDB [![Go Reference](https://pkg.go.dev/badge/github.com/mgulsoy/arnedb.svg)](https://pkg.go.dev/github.com/mgulsoy/arnedb) [![Go Report Card](https://goreportcard.com/badge/github.com/mgulsoy/arnedb)](https://goreportcard.com/report/github.com/mgulsoy/arnedb) [![codecov](https://codecov.io/github/mgulsoy/arnedb/branch/main/graph/badge.svg?token=5JRV5PE5CC)](https://codecov.io/github/mgulsoy/arnedb) ![test](https://github.com/mgulsoy/arnedb/actions/workflows/go.yml/badge.svg)
 ArneDB is an embedded document (NoSql) database implemented in pure GO. There is no server implementation.
 Just import the package and GO.
 
